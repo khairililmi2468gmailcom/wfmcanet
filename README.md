@@ -168,7 +168,7 @@ If you use this work in your research, please cite:
 ## Author
 
 Khairil Ilmi
-
+Juwita
 Master of Artificial Intelligence
 Universitas Syiah Kuala
 Banda Aceh, Indonesia
