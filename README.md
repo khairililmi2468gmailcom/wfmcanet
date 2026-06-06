@@ -161,7 +161,7 @@ Banda Aceh, Indonesia
 
 ### Juwita
 
-Department of Informatics
+Lecturer, Department of Informatics
 Universitas Syiah Kuala
 Banda Aceh, Indonesia
 
