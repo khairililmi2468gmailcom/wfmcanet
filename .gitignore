@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.log
+
+results/
+results_d4h/
+
+checkpoints_d4h/
+
+app_demo.zip
