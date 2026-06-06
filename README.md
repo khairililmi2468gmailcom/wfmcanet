@@ -150,10 +150,26 @@ http://localhost:5000
    * Inference Time
 
 ---
+## Authors
+
+### Khairil Ilmi
+
+Master of Artificial Intelligence
+Department of Informatics
+Universitas Syiah Kuala
+Banda Aceh, Indonesia
+
+### Juwita
+
+Department of Informatics
+Universitas Syiah Kuala
+Banda Aceh, Indonesia
+
+---
 
 ## Citation
 
-If you use this work in your research, please cite:
+If you use WF-MCANet in your research, please cite:
 
 ```bibtex
 @article{ilmi2026wfmcanet,
@@ -165,13 +181,16 @@ If you use this work in your research, please cite:
 
 ---
 
-## Author
+## Corresponding Author
 
 Khairil Ilmi
-Juwita
-Master of Artificial Intelligence
-Universitas Syiah Kuala
-Banda Aceh, Indonesia
+Email: [khairililmi2468@gmail.com](mailto:khairililmi2468@gmail.com)
+
+---
+
+## Acknowledgement
+
+This work was conducted at the Department of Informatics, Universitas Syiah Kuala, Banda Aceh, Indonesia.
 
 ---
 
