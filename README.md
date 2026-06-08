@@ -90,7 +90,7 @@ overlay, lesion coverage, and inference time for an uploaded medical image.
 > Note: a Dice of ~0.96 is above typical ISIC 2018 results, so verify the held-out test split
 > (no train/test overlap) before over-interpreting the absolute in-domain numbers.
 
-![Ablation on ISIC 2018](assets/results_ablation.png)
+![Ablation on ISIC 2018](assets/results_ablation_figure.png)
 
 ### Cross-domain zero-shot — Kvasir-SEG (no retraining)
 
@@ -107,7 +107,7 @@ overlay, lesion coverage, and inference time for an uploaded medical image.
 > an unseen domain. Absolute Dice (~0.60) is modest, as expected across a large modality gap; this is
 > a generalisation analysis, not clinical-grade polyp segmentation.
 
-![Zero-shot on Kvasir-SEG](assets/results_zeroshot.png)
+![Zero-shot on Kvasir-SEG](assets/results_zeroshot_figure.png)
 
 ### Evaluation Protocol
 
