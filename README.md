@@ -1,13 +1,13 @@
 # WF-MCANet
 
-### A Lightweight Wavelet Frequency Network with Cross-Axis Attention for Medical Image Segmentation
+### A Wavelet Frequency Module for Cross-Domain Generalisation in Cross-Axis Attention Medical Image Segmentation
 
-> Bringing frequency-domain edge evidence into a compact cross-axis attention decoder, so that lesion boundaries are delineated more precisely at almost no extra parameter cost.
+> Bringing frequency-domain edge evidence into a cross-axis attention decoder. The module gives no benefit when in-domain accuracy is already saturated, but it measurably improves cross-domain (zero-shot) boundary accuracy.
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
 ![PyTorch](https://img.shields.io/badge/Framework-PyTorch-ee4c2c)
-![Task](https://img.shields.io/badge/Task-Medical%20Image%20Segmentation-2e7d32)
-![Params](https://img.shields.io/badge/Parameters-4.24M-555)
+![Backbone](https://img.shields.io/badge/Backbone-EfficientNet--B3-2e7d32)
+![Params](https://img.shields.io/badge/Parameters-~10.3M-555)
 ![Status](https://img.shields.io/badge/Status-Research%20%2F%20Manuscript%20under%20review-orange)
 
 **Authors:** Khairil Ilmi, Juwita · Department of Informatics, Universitas Syiah Kuala, Banda Aceh, Indonesia
@@ -17,51 +17,49 @@
 ## Overview
 
 Most deep-learning segmentation models reason only in the spatial domain and never look at the
-frequency content of an image, even though high-frequency components are exactly what encode
-sharp lesion edges. **WF-MCANet** addresses this by inserting a **Wavelet Frequency Module (WFM)**
-into the decoder of the lightweight MCANet framework. The WFM decomposes decoder features with a
-Haar wavelet transform, reweights the resulting sub-bands with channel attention, and injects the
-result back into the spatial stream through a **learnable gated fusion**.
+frequency content of an image, even though high-frequency components encode the sharp transitions
+that correspond to lesion edges. **WF-MCANet** inserts a **Wavelet Frequency Module (WFM)** into the
+decoder of the MCANet cross-axis attention framework. The WFM decomposes decoder features with a
+Haar wavelet transform, reweights the four sub-bands with Squeeze-and-Excitation channel attention,
+and merges them back into the spatial stream through a **learnable gate**.
 
-The model is trained on the **ISIC 2018** skin-lesion dataset and additionally probed in a
-**zero-shot** setting on the **Kvasir-SEG** polyp dataset (no retraining), using a boundary-focused
-evaluation protocol built around the 95th-percentile Hausdorff Distance (HD95). The result is a
-small but consistent boundary-accuracy gain that costs only **+0.20 M parameters** over the baseline,
-which keeps the model deployable on modest clinical hardware.
+The model (EfficientNet-B3 backbone, ~10.3 M parameters) is trained on **ISIC 2018** (dermoscopy) and
+tested zero-shot, without retraining, on **Kvasir-SEG** (colonoscopy), using a boundary-focused
+protocol built around the 95th-percentile Hausdorff Distance (HD95).
+
+**Main finding (stated honestly).** On the in-domain ISIC 2018 task, performance is already saturated
+(~0.96 Dice for every configuration including the baseline), so the WFM provides **no in-domain gain**.
+Its value appears under **cross-domain transfer**: the full model improves zero-shot Kvasir-SEG Dice
+from 0.548 to 0.601 and reduces HD95 from 179.4 px to 143.5 px versus the spatial baseline.
 
 ---
 
-## Highlights and Novelty
+## Highlights and Contributions
 
-- **Wavelet Frequency Module (WFM)** placed *inside the decoder* rather than at the encoder input,
-  so frequency-domain edge evidence is supplied directly to the attention-based decoder.
-- **Haar wavelet decomposition** into four sub-bands: LL (Low–Low), LH (Low–High), HL (High–Low),
-  and HH (High–High), with the diagonal HH band capturing edges that axis-aligned convolutions miss.
-- **Squeeze-and-Excitation channel attention** across the wavelet sub-bands to emphasise the most
-  informative frequency channels.
-- **Learnable gated fusion** `F_new = F_spatial + σ(g) · Upsample(F_wav)` that controls how much of
-  the frequency stream is injected, preventing noisy high-frequency artefacts from corrupting the
-  spatial features.
-- **Cross-axis multi-context attention decoder** inherited from MCANet for efficient global context.
-- **HD95-oriented evaluation protocol** that reports worst-case boundary error, which is the value
-  most relevant for surgical-margin planning, instead of relying on area-overlap metrics alone.
-- **Cross-domain zero-shot analysis** (ISIC 2018 → Kvasir-SEG) to study whether frequency cues
-  transfer across imaging modalities.
-- **Lightweight by design**: the proposed configuration adds only **0.20 M parameters** (4.04 M → 4.24 M).
+- **Wavelet Frequency Module (WFM)** placed *inside the decoder*. The contribution is not the Haar
+  transform itself (which is classical) but a learnable module that uses Haar decomposition to
+  strengthen edge evidence in an attention-based decoder.
+- **Haar decomposition** into four sub-bands: LL (Low–Low), LH (Low–High), HL (High–Low), HH
+  (High–High); the diagonal HH band captures edges that axis-aligned convolutions recover least well.
+- **Squeeze-and-Excitation channel attention** over the sub-bands (after Hu et al.).
+- **Learnable gated fusion** `F_new = F_spatial + σ(g) · Upsample(F_wav)` that protects the spatial
+  stream from noisy high-frequency activations.
+- **HD95-oriented evaluation** plus a **cross-domain zero-shot** protocol (ISIC 2018 → Kvasir-SEG).
+- **Key result:** the frequency module improves *cross-domain generalisation*, not in-domain accuracy.
 
 ---
 
 ## Architecture
 
-**Overall network.** A lightweight encoder produces multi-scale features that are decoded by
-multi-scale cross-axis attention blocks. The deepest feature is passed through the WFM, whose output
-is merged into the spatial stream by a learnable gate before the final segmentation head.
+**Overall network.** Multi-scale features from the EfficientNet-B3 encoder are decoded by a cross-axis
+attention block. The WFM supplies frequency-domain edge evidence, merged into the spatial stream by a
+learnable gate before the segmentation head.
 
 ![Overall architecture of WF-MCANet](assets/architecture_overall.png)
 
-**Wavelet Frequency Module (WFM).** The input feature is decomposed by a Haar wavelet transform into
-four sub-bands, concatenated, reweighted by Squeeze-and-Excitation channel attention, reduced by a
-1×1 convolution, upsampled, and finally fused with the spatial feature through the learnable gate.
+**Wavelet Frequency Module (WFM).** The input feature is decomposed by a Haar transform into four
+sub-bands, reweighted by Squeeze-and-Excitation channel attention, reduced by a 1×1 convolution,
+upsampled, and fused with the spatial feature through the learnable gate.
 
 ![Detailed structure of the Wavelet Frequency Module](assets/wfm_module.png)
 
@@ -69,63 +67,53 @@ four sub-bands, concatenated, reweighted by Squeeze-and-Excitation channel atten
 
 ## Demo
 
-A web-based demonstration application runs the final WF-MCANet checkpoint and shows the predicted
-mask, overlay, lesion coverage, and inference time for an uploaded medical image.
+A web-based demonstration application runs the trained checkpoint and shows the predicted mask,
+overlay, lesion coverage, and inference time for an uploaded medical image.
 
 ![WF-MCANet demo application](assets/demo.png)
 
 ---
 
-## Results
+## Results (real, measured)
 
-### Skin-Lesion Segmentation — ISIC 2018 (ablation)
+### In-domain ablation — ISIC 2018
 
-| Configuration                | WFM | Dice ↑     | HD95 (px) ↓ | Parameters |
-| ---------------------------- | :-: | ---------- | ----------- | ---------- |
-| Baseline (MCANet)            |  –  | 0.9100     | 23.79       | 4.04 M     |
-| **Baseline + WFM (Ours)**    |  ✓  | **0.9123** | **23.52**   | 4.24 M     |
-| Baseline + Edge Loss only    |  –  | 0.9088     | 24.48       | 4.04 M     |
-| Full WF-MCANet (EffNet-B3)   |  ✓  | 0.9097     | 23.69       | 13.10 M    |
+| Configuration             | WFM | Edge | Dice ↑          | IoU ↑  | HD95 (px) ↓    | Param. (M) |
+| ------------------------- | :-: | :--: | --------------- | ------ | -------------- | ---------- |
+| A: Baseline (MCANet)      |  –  |  –   | 0.9603 ± 0.059  | 0.9283 | 11.28 ± 17.2   | 10.22      |
+| B: Baseline + WFM         |  ✓  |  –   | 0.9600 ± 0.061  | 0.9279 | 11.90 ± 19.8   | 10.27      |
+| C: Baseline + Edge loss   |  –  |  ✓   | 0.9617 ± 0.051  | 0.9301 | 11.42 ± 18.9   | 10.22      |
+| D: Full (WFM + Edge)      |  ✓  |  ✓   | 0.9600 ± 0.059  | 0.9278 | 11.93 ± 19.2   | 10.27      |
 
-The improvement over the baseline is **small but consistent** (+0.0023 Dice, −0.27 px HD95) and is
-obtained with only **+0.20 M parameters**. Two observations are worth noting: adding an edge-aware
-loss *without* the WFM actually hurts both metrics, and the heavier EfficientNet-B3 variant does not
-outperform the compact model, which points to better trainability of the lightweight design.
+> **In-domain, the four configurations are statistically indistinguishable** (gaps are far smaller
+> than the standard deviation). The task is saturated and the WFM gives no in-domain benefit.
+> Note: a Dice of ~0.96 is above typical ISIC 2018 results, so verify the held-out test split
+> (no train/test overlap) before over-interpreting the absolute in-domain numbers.
 
-![Ablation results on ISIC 2018](assets/results_ablation.png)
+![Ablation on ISIC 2018](assets/results_ablation.png)
 
-**Qualitative result.** Predicted lesion area (green overlay) and boundary (red contour) on a
-dermoscopic image, produced by the demo application.
+### Cross-domain zero-shot — Kvasir-SEG (no retraining)
 
-<p align="center">
-  <img src="assets/qualitative_isic.png" alt="Qualitative segmentation result on a dermoscopic image" width="360">
-</p>
+| Configuration             | Dice ↑    | IoU ↑     | HD95 (px) ↓ |
+| ------------------------- | --------- | --------- | ----------- |
+| A: Baseline (MCANet)      | 0.5477    | 0.4295    | 179.44      |
+| B: Baseline + WFM         | 0.5573    | 0.4437    | 178.93      |
+| C: Baseline + Edge loss   | 0.6049    | 0.4877    | 157.53      |
+| **D: Full (WFM + Edge)**  | **0.6011**| **0.4856**| **143.47**  |
 
-### Cross-Domain Zero-Shot Analysis — Kvasir-SEG (no retraining)
+> **Cross-domain is where the module helps.** The full model achieves the best boundary accuracy
+> (HD95 143.5 px vs 179.4 px for the baseline). Comparing C (edge only) with D (edge + WFM) isolates
+> the WFM: similar Dice, but HD95 drops from 157.5 to 143.5 px — the module tightens the boundary in
+> an unseen domain. Absolute Dice (~0.60) is modest, as expected across a large modality gap; this is
+> a generalisation analysis, not clinical-grade polyp segmentation.
 
-The model is trained only on ISIC 2018 and applied directly to colonoscopic polyp images.
-
-| Configuration                | Dice ↑    | HD95 (px) ↓ |
-| ---------------------------- | --------- | ----------- |
-| Baseline (MCANet)            | 0.287     | 206.10      |
-| **Baseline + WFM (Ours)**    | **0.296** | **198.74**  |
-| Baseline + Edge Loss only    | 0.281     | 212.33      |
-| Full WF-MCANet (EffNet-B3)   | 0.289     | 202.33      |
-
-> **Note (read honestly):** absolute scores are low here because of the large modality gap between
-> dermoscopic and colonoscopic images, which is expected for a zero-shot transfer. This is an
-> *exploratory generalization analysis*, not a claim of clinical-grade polyp segmentation. Within
-> this setting, the WFM variant ranks first on both metrics, which suggests that the wavelet-encoded
-> boundary geometry transfers better than purely spatial features.
-
-![Zero-shot results on Kvasir-SEG](assets/results_zeroshot.png)
+![Zero-shot on Kvasir-SEG](assets/results_zeroshot.png)
 
 ### Evaluation Protocol
 
-- **Dice** — area overlap between prediction and ground truth.
-- **IoU** — alternative overlap measure.
-- **HD95** — 95th percentile of the symmetric boundary distance; reports worst-case boundary error,
-  which matters most for surgical-margin planning.
+- **Dice / IoU** — area-overlap metrics.
+- **HD95** — 95th-percentile symmetric boundary distance; worst-case boundary error, most relevant
+  for surgical-margin planning.
 
 ---
 
@@ -134,37 +122,19 @@ The model is trained only on ISIC 2018 and applied directly to colonoscopic poly
 ```text
 .
 ├── train.py                  # training entry point
-├── mscan_official.py         # MSCAN / encoder definition
+├── generate_figures.py       # measures real metrics + renders all journal figures
+├── setup.sh                  # dataset download + environment setup
 ├── app_demo
 │   ├── app.py                # demo server
 │   ├── model.py              # WF-MCANet model definition
 │   ├── index.html            # demo web UI
-│   ├── run_demo.sh           # launch script
+│   ├── run_demo.sh
 │   ├── requirements.txt
 │   └── checkpoints
-│       └── D_WFMCANet_Full_best.pt   # trained checkpoint
+│       └── D_WFMCANet_Full_best.pt
 ├── assets                    # figures used in this README
-│   ├── architecture_overall.png
-│   ├── wfm_module.png
-│   ├── results_ablation.png
-│   ├── results_zeroshot.png
-│   ├── qualitative_isic.png
-│   └── demo.png
-├── demo.png
 └── README.md
 ```
-
----
-
-## Trained Model
-
-The repository ships with the final trained checkpoint:
-
-```text
-app_demo/checkpoints/D_WFMCANet_Full_best.pt
-```
-
-generated with `train.py`.
 
 ---
 
@@ -180,20 +150,17 @@ pip install -r requirements.txt
 
 ```bash
 bash run_demo.sh
+# then open http://localhost:5000
 ```
 
-Then open:
+## Reproduce the Figures and Metrics
 
-```text
-http://localhost:5000
+```bash
+export KAGGLE_USERNAME=...   # use a freshly generated token
+export KAGGLE_KEY=...
+bash setup.sh
+python generate_figures.py --checkpoints ./checkpoints --out ./journal_assets
 ```
-
-## Usage
-
-1. Launch the application.
-2. Upload a dermoscopic (or polyp) image.
-3. Click **Run Analysis**.
-4. Inspect the output: segmentation mask, overlay visualization, coverage statistics, and inference time.
 
 ---
 
@@ -206,11 +173,9 @@ http://localhost:5000
 
 ## Citation
 
-If you use WF-MCANet in your research, please cite:
-
 ```bibtex
 @article{ilmi2026wfmcanet,
-  title   = {A Lightweight Wavelet Frequency Network with Cross-Axis Attention for Medical Image Segmentation},
+  title   = {A Wavelet Frequency Module for Cross-Domain Generalisation in Cross-Axis Attention Medical Image Segmentation},
   author  = {Ilmi, Khairil and Juwita},
   year    = {2026},
   note    = {Manuscript under review}
@@ -225,12 +190,6 @@ If you use WF-MCANet in your research, please cite:
 **Juwita** — Lecturer, Department of Informatics, Universitas Syiah Kuala, Banda Aceh, Indonesia
 
 **Corresponding author:** Khairil Ilmi · khairililmi2468@gmail.com
-
----
-
-## Acknowledgement
-
-This work was conducted at the Department of Informatics, Universitas Syiah Kuala, Banda Aceh, Indonesia.
 
 ---
 

@@ -1,70 +1,64 @@
-#!/bin/bash
-# ============================================================
-# setup.sh — jalankan SEKALI sebelum training pertama
-# ============================================================
-# Usage:
-#   source /mnt/gpu17/miniconda3/bin/activate
-#   conda activate rw-env
-#   cd /mnt/gpu17/segilmi
-#   bash setup.sh
-# ============================================================
+#!/usr/bin/env bash
+# =============================================================================
+#  WF-MCANet — dataset download + environment setup (run on the H100 server)
+# =============================================================================
+#  SECURITY: never hard-code your Kaggle token in this file or in logs.
+#  Your previously pasted token KGAT_... is now exposed — REVOKE it at
+#  https://www.kaggle.com/settings  ->  "Expire API Token", then create a new one.
+#
+#  Before running, export your credentials in the shell (they are NOT stored here):
+#     export KAGGLE_USERNAME=your_kaggle_username
+#     export KAGGLE_KEY=your_new_kaggle_key
+#     ./setup.sh
+# =============================================================================
+set -e
 
-set -e   # stop on error
+BASE=/mnt/gpu17/segilmi
+DATA=$BASE/data
+ISIC=$DATA/ISIC2018
+KV=$DATA/Kvasir-SEG
+mkdir -p "$ISIC" "$KV" "$BASE/results" "$BASE/checkpoints"
 
-echo "=============================================="
-echo "  WF-MCANet Setup — H100 Server"
-echo "=============================================="
+echo "== [1/3] Installing Python dependencies =="
+pip install -q timm albumentations medpy matplotlib pandas scipy pillow \
+            opencv-python-headless kaggle PyWavelets
 
-# 1. Set Kaggle token
-export KAGGLE_API_TOKEN="KGAT_ea6881d628c7ca0551fcce57100d121c"
-
-# Tulis kaggle.json agar CLI bisa baca
+echo "== [2/3] Configuring Kaggle credentials (from environment) =="
 mkdir -p ~/.kaggle
-# Token format KGAT_xxx: username perlu diset terpisah
-# Ganti "your_kaggle_username" dengan username Kaggle Anda
-KAGGLE_USER="${KAGGLE_USERNAME:-kibrobro}"
-echo "{\"username\":\"${KAGGLE_USER}\",\"key\":\"${KAGGLE_API_TOKEN}\"}" > ~/.kaggle/kaggle.json
-chmod 600 ~/.kaggle/kaggle.json
-echo "kaggle.json created at ~/.kaggle/kaggle.json"
+if [ -n "$KAGGLE_USERNAME" ] && [ -n "$KAGGLE_KEY" ]; then
+  printf '{"username":"%s","key":"%s"}' "$KAGGLE_USERNAME" "$KAGGLE_KEY" > ~/.kaggle/kaggle.json
+  chmod 600 ~/.kaggle/kaggle.json
+  echo "   kaggle.json written."
+else
+  echo "   WARNING: KAGGLE_USERNAME / KAGGLE_KEY not set. Export them and re-run." >&2
+fi
 
-# 2. Install Python packages
-echo ""
-echo "Installing packages..."
-pip install -q --upgrade timm
-pip install -q medpy
-pip install -q kaggle
-pip install -q "albumentations==1.3.1"
+echo "== [3/3] Downloading datasets =="
+if [ ! -d "$ISIC/ISIC2018_Task1-2_Training_Input" ]; then
+  echo "   Downloading ISIC 2018 ..."
+  ( cd "$ISIC" && \
+    kaggle datasets download -d tschandl/isic2018-challenge-task1-data-segmentation && \
+    unzip -q isic2018-challenge-task1-data-segmentation.zip && \
+    rm -f isic2018-challenge-task1-data-segmentation.zip )
+else
+  echo "   ISIC 2018 already present."
+fi
+
+if [ ! -d "$KV/images" ]; then
+  echo "   Downloading Kvasir-SEG ..."
+  ( cd "$KV" && \
+    kaggle datasets download -d debeshjha1/kvasirseg && \
+    unzip -q kvasirseg.zip && rm -f kvasirseg.zip )
+  for n in kvasir-seg Kvasir-SEG kvasirseg; do
+    if [ -d "$KV/$n" ]; then
+      mv "$KV/$n/images" "$KV/" 2>/dev/null || true
+      mv "$KV/$n/masks"  "$KV/" 2>/dev/null || true
+    fi
+  done
+else
+  echo "   Kvasir-SEG already present."
+fi
 
 echo ""
-echo "Package versions:"
-python -c "
-import timm, medpy, albumentations, torch
-print(f'  torch          {torch.__version__}')
-print(f'  timm           {timm.__version__}')
-print(f'  albumentations {albumentations.__version__}')
-print(f'  mscan_t in timm: {\"mscan_t\" in timm.list_models()}')
-print(f'  mit_b1  in timm: {\"mit_b1\" in timm.list_models()}')
-"
-
-# 3. Buat folder struktur
-echo ""
-echo "Creating directories..."
-mkdir -p /mnt/gpu17/segilmi/{data/ISIC2018,data/Kvasir-SEG,results,checkpoints}
-echo "  /mnt/gpu17/segilmi/data/ISIC2018"
-echo "  /mnt/gpu17/segilmi/data/Kvasir-SEG"
-echo "  /mnt/gpu17/segilmi/results"
-echo "  /mnt/gpu17/segilmi/checkpoints"
-
-echo ""
-echo "=============================================="
-echo "  Setup complete!"
-echo "  Sekarang jalankan training dengan:"
-echo ""
-echo "    tmux new -s wfmcnet"
-echo "    source /mnt/gpu17/miniconda3/bin/activate"
-echo "    conda activate rw-env"
-echo "    cd /mnt/gpu17/segilmi"
-echo "    export KAGGLE_API_TOKEN=KGAT_ea6881d628c7ca0551fcce57100d121c"
-echo "    python train.py 2>&1 | tee -a train.log"
-echo "    # Ctrl+B  D   untuk detach"
-echo "=============================================="
+echo "== Setup complete. Next, generate the real figures + metrics: =="
+echo "   python generate_figures.py --checkpoints $BASE/checkpoints --out $BASE/journal_assets"
